@@ -1,0 +1,6 @@
+@MediTimeApi_HostAddress = http://localhost:5020
+
+GET {{MediTimeApi_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
