@@ -41,20 +41,23 @@ public class UsuariosController : ControllerBase
         var usuario = _usuarioService.Login(loginRequest.Email, loginRequest.Contrasena);
         if (usuario != null)
         {
+            // Generar un token falso (o real si implementaras JWT) para que el frontend no falle
+            string fakeToken = Guid.NewGuid().ToString();
+
             return Ok(new
             {
                 message = "Inicio de sesión correcto",
-                usuario = new
-                {
-                    usuario.Nombre,
-                    usuario.Apellidos,
-                    usuario.Email,
-                    usuario.Fecha_Nacimiento,
-                    usuario.Telefono,
-                    usuario.Domicilio,
-                    usuario.Notificaciones,
-                    usuario.IsAdmin
-                }
+                token = fakeToken, // auth.js lo necesita
+                idUsuario = usuario.IdUsuario, // auth.js lo usa como userId
+                nombre = usuario.Nombre,
+                apellidos = usuario.Apellidos,
+                email = usuario.Email,
+                isAdmin = usuario.IsAdmin ? 1 : 0, // auth.js espera 1 o 0 (o bool si comprueba === 1)
+                // Otros datos si fueran necesarios
+                fecha_Nacimiento = usuario.Fecha_Nacimiento,
+                telefono = usuario.Telefono,
+                domicilio = usuario.Domicilio,
+                notificaciones = usuario.Notificaciones
             });
         }
 
