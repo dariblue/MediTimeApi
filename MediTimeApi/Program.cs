@@ -2,6 +2,7 @@ using MediTimeApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddScoped<UsuarioService>();
+builder.Services.AddScoped<MedicamentoService>();
 // Habilita CORS globalmente
 builder.Services.AddCors(options =>
 {
