@@ -1,17 +1,14 @@
-﻿namespace MediTimeApi.Models
+namespace MediTimeApi.Models
 {
     public class Usuario
     {
-        public int IdUsuario { get; set; }
-        public string Nombre { get; set; }
-        public string Apellidos { get; set; }
-        public string Contrasena { get; set; }
-        public DateTime Fecha_Nacimiento { get; set; }
-        public string Email { get; set; }
-        public int Telefono { get; set; }
-        public string Domicilio { get; set; }
-        public bool Notificaciones { get; set; }
-        public bool IsAdmin { get; set; }
-
+        public int IDUsuario { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Apellidos { get; set; } = string.Empty;
+        public string Email { get; set; } = string.Empty;
+        public string Contrasena { get; set; } = string.Empty;
+        public string Rol { get; set; } = "Usuario"; // 'Usuario', 'Responsable', 'Cuidador'
+        public bool EsResponsable { get; set; }
+        public string? PushToken { get; set; }
     }
 }

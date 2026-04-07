@@ -1,8 +1,17 @@
+using MediTimeApi;
 using MediTimeApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Registrar Database como servicio Scoped para DI
+builder.Services.AddScoped<Database>();
+
+// Registrar todos los servicios
 builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<MedicamentoService>();
+builder.Services.AddScoped<PacienteCuidadorService>();
+builder.Services.AddScoped<HistorialTomaService>();
+
 // Habilita CORS globalmente
 builder.Services.AddCors(options =>
 {
@@ -18,15 +27,29 @@ builder.Services.AddCors(options =>
 // Swagger y controladores
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(options =>
+{
+    options.SwaggerDoc("v2", new Microsoft.OpenApi.Models.OpenApiInfo
+    {
+        Title = "MediTime API",
+        Version = "2.0",
+        Description = "API REST para la gestión y supervisión de toma de medicamentos — MediTime v2.0"
+    });
+});
 
 var app = builder.Build();
+
+Console.WriteLine("=== MediTime API v2.0 ===");
+Console.WriteLine($"Entorno: {app.Environment.EnvironmentName}");
 
 // Swagger solo en desarrollo
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
-    app.UseSwaggerUI();
+    app.UseSwaggerUI(options =>
+    {
+        options.SwaggerEndpoint("/swagger/v2/swagger.json", "MediTime API v2.0");
+    });
 }
 
 // Usa CORS antes de los endpoints

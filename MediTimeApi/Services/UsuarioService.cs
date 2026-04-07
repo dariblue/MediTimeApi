@@ -1,123 +1,172 @@
-﻿using MySql.Data.MySqlClient;
-using MediTimeApi.Models;
+using MySql.Data.MySqlClient;
 using MediTimeApi.Models;
 
 namespace MediTimeApi.Services
 {
     public class UsuarioService
     {
-        private readonly string _connectionString;
+        private readonly Database _database;
 
-        public UsuarioService(IConfiguration configuration)
+        public UsuarioService(Database database)
         {
-            _connectionString = configuration.GetConnectionString("DefaultConnection");
+            _database = database;
         }
 
-        public bool RegistrarUsuario(Usuario usuario)
+        /// <summary>
+        /// Registra un nuevo usuario. Si Rol='Usuario' y EsResponsable=false,
+        /// exige IdResponsableAsignado y crea el vínculo en PACIENTE_CUIDADOR
+        /// de forma atómica (transacción).
+        /// </summary>
+        public bool RegistrarUsuario(RegistroRequest request)
         {
-            using var connection = new MySqlConnection(_connectionString);
+            // Validar regla de negocio: paciente no autónomo necesita responsable
+            if (request.Rol == "Usuario" && !request.EsResponsable)
+            {
+                if (!request.IdResponsableAsignado.HasValue || request.IdResponsableAsignado.Value <= 0)
+                {
+                    throw new ArgumentException(
+                        "Un paciente con EsResponsable=false debe tener un IdResponsableAsignado válido.");
+                }
+            }
+
+            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(request.Contrasena);
+
+            using var connection = _database.GetConnection();
             connection.Open();
-                       
-            // Hashear contraseña antes de guardar
-            string hashedPassword = BCrypt.Net.BCrypt.HashPassword(usuario.Contrasena);
+            using var transaction = connection.BeginTransaction();
 
-            var command = new MySqlCommand("INSERT INTO Usuarios (Nombre, Apellidos, Contrasena, Fecha_Nacimiento, Email, Telefono, Domicilio, Notificaciones) VALUES (@Nombre, @Apellidos, @Contrasena, @FechaNacimiento, @Email, @Telefono, @Domicilio, @Notificaciones)", connection);
+            try
+            {
+                // INSERT del usuario
+                var insertUsuario = new MySqlCommand(
+                    @"INSERT INTO USUARIOS (Nombre, Apellidos, Email, Contrasena, Rol, EsResponsable, PushToken)
+                      VALUES (@Nombre, @Apellidos, @Email, @Contrasena, @Rol, @EsResponsable, @PushToken)",
+                    connection, transaction);
 
-            command.Parameters.AddWithValue("@Nombre", usuario.Nombre);
-            command.Parameters.AddWithValue("@Apellidos", usuario.Apellidos);
-            command.Parameters.AddWithValue("@Contrasena", hashedPassword); // Usar hash
-            command.Parameters.AddWithValue("@FechaNacimiento", usuario.Fecha_Nacimiento);
-            command.Parameters.AddWithValue("@Email", usuario.Email);
-            command.Parameters.AddWithValue("@Telefono", usuario.Telefono);
-            command.Parameters.AddWithValue("@Domicilio", usuario.Domicilio);
-            command.Parameters.AddWithValue("@Notificaciones", usuario.Notificaciones);
+                insertUsuario.Parameters.AddWithValue("@Nombre", request.Nombre);
+                insertUsuario.Parameters.AddWithValue("@Apellidos", request.Apellidos);
+                insertUsuario.Parameters.AddWithValue("@Email", request.Email);
+                insertUsuario.Parameters.AddWithValue("@Contrasena", hashedPassword);
+                insertUsuario.Parameters.AddWithValue("@Rol", request.Rol);
+                insertUsuario.Parameters.AddWithValue("@EsResponsable", request.EsResponsable);
+                insertUsuario.Parameters.AddWithValue("@PushToken", (object?)request.PushToken ?? DBNull.Value);
 
-            return command.ExecuteNonQuery() > 0;
+                insertUsuario.ExecuteNonQuery();
+                long nuevoId = insertUsuario.LastInsertedId;
+
+                // Si es paciente no autónomo, crear vínculo con responsable
+                if (request.Rol == "Usuario" && !request.EsResponsable)
+                {
+                    var insertVinculo = new MySqlCommand(
+                        @"INSERT INTO PACIENTE_CUIDADOR (IDPaciente, IDCuidador) VALUES (@IDPaciente, @IDCuidador)",
+                        connection, transaction);
+
+                    insertVinculo.Parameters.AddWithValue("@IDPaciente", nuevoId);
+                    insertVinculo.Parameters.AddWithValue("@IDCuidador", request.IdResponsableAsignado!.Value);
+                    insertVinculo.ExecuteNonQuery();
+                }
+
+                transaction.Commit();
+                return true;
+            }
+            catch
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
+        /// <summary>
+        /// Login: busca por email y verifica contraseña con bcrypt.
+        /// </summary>
         public Usuario? Login(string email, string contrasena)
         {
-            using var connection = new MySqlConnection(_connectionString);
+            using var connection = _database.GetConnection();
             connection.Open();
-            
-            // 1. Buscar SOLO por email
-            var command = new MySqlCommand("SELECT * FROM Usuarios WHERE Email = @Email", connection);
+
+            var command = new MySqlCommand(
+                "SELECT IDUsuario, Nombre, Apellidos, Email, Contrasena, Rol, EsResponsable, PushToken FROM USUARIOS WHERE Email = @Email",
+                connection);
             command.Parameters.AddWithValue("@Email", email);
 
             using var reader = command.ExecuteReader();
             if (reader.Read())
             {
-                // 2. Obtener el hash guardado
-                string storedHash = reader["Contrasena"].ToString();
-                bool isPasswordValid = false;
+                string storedHash = reader["Contrasena"]?.ToString() ?? "";
+                bool isValid = false;
 
-                try 
+                try
                 {
-                    // Intentar verificar como Hash BCrypt
-                    isPasswordValid = BCrypt.Net.BCrypt.Verify(contrasena, storedHash);
+                    isValid = BCrypt.Net.BCrypt.Verify(contrasena, storedHash);
                 }
-                catch (Exception)
+                catch
                 {
-                    // Fallback texto plano
-                    isPasswordValid = (contrasena == storedHash); 
+                    // Fallback texto plano (para migraciones pendientes)
+                    isValid = contrasena == storedHash;
                 }
 
-                if (isPasswordValid)
+                if (isValid)
                 {
-                    try 
-                    {
-                        var u = new Usuario();
-                        // Mapeo seguro campo a campo
-                        u.IdUsuario = reader["IdUsuario"] != DBNull.Value ? Convert.ToInt32(reader["IdUsuario"]) : 0;
-                        u.Nombre = reader["Nombre"]?.ToString() ?? "";
-                        u.Apellidos = reader["Apellidos"]?.ToString() ?? "";
-                        u.Email = reader["Email"]?.ToString() ?? "";
-                        u.Contrasena = ""; // Ocultar hash
-                        
-                        // Fecha segura
-                        if (reader["Fecha_Nacimiento"] != DBNull.Value)
-                        {
-                            try { u.Fecha_Nacimiento = Convert.ToDateTime(reader["Fecha_Nacimiento"]); }
-                            catch { u.Fecha_Nacimiento = DateTime.MinValue; }
-                        }
-                        
-                        u.Telefono = reader["Telefono"] != DBNull.Value ? Convert.ToInt32(reader["Telefono"]) : 0;
-                        u.Domicilio = reader["Domicilio"]?.ToString() ?? "";
-                        
-                        // Booleanos seguros (TINYINT/BIT que puede venir como byte[])
-                        u.Notificaciones = false;
-                        if (reader["Notificaciones"] != DBNull.Value)
-                        {
-                            var val = reader["Notificaciones"];
-                            if (val is bool b) u.Notificaciones = b;
-                            else if (val is byte[] bytes && bytes.Length > 0) u.Notificaciones = bytes[0] == 1;
-                            else if (val is sbyte sb) u.Notificaciones = sb == 1;
-                            else if (val is byte by) u.Notificaciones = by == 1;
-                            else try { u.Notificaciones = Convert.ToBoolean(val); } catch {}
-                        }
-
-                        u.IsAdmin = false;
-                        if (reader["IsAdmin"] != DBNull.Value)
-                        {
-                            var val = reader["IsAdmin"];
-                            if (val is bool b) u.IsAdmin = b;
-                            else if (val is byte[] bytes && bytes.Length > 0) u.IsAdmin = bytes[0] == 1;
-                            else if (val is sbyte sb) u.IsAdmin = sb == 1;
-                            else if (val is byte by) u.IsAdmin = by == 1;
-                            else try { u.IsAdmin = Convert.ToBoolean(val); } catch {}
-                        }
-                        
-                        return u;
-                    }
-                    catch (Exception ex)
-                    {
-                        // Loguear el error si pudieras, pero al menos no explotar
-                        Console.WriteLine("Error mapeando usuario: " + ex.Message);
-                        return null; // Devolver null hará que salga "Credenciales incorrectas" en vez de 500
-                    }
+                    return MapUsuario(reader);
                 }
             }
+
             return null;
+        }
+
+        /// <summary>
+        /// Obtiene un usuario por ID, incluyendo la lista de sus supervisores
+        /// si es un paciente (JOIN con PACIENTE_CUIDADOR).
+        /// </summary>
+        public Usuario? GetUsuarioById(int id)
+        {
+            using var connection = _database.GetConnection();
+            connection.Open();
+
+            var command = new MySqlCommand(
+                "SELECT IDUsuario, Nombre, Apellidos, Email, Rol, EsResponsable, PushToken FROM USUARIOS WHERE IDUsuario = @Id",
+                connection);
+            command.Parameters.AddWithValue("@Id", id);
+
+            using var reader = command.ExecuteReader();
+            if (reader.Read())
+            {
+                return MapUsuario(reader);
+            }
+
+            return null;
+        }
+
+        /// <summary>
+        /// Mapea un MySqlDataReader a un objeto Usuario (sin exponer la contraseña).
+        /// </summary>
+        private Usuario MapUsuario(MySqlDataReader reader)
+        {
+            var u = new Usuario
+            {
+                IDUsuario = Convert.ToInt32(reader["IDUsuario"]),
+                Nombre = reader["Nombre"]?.ToString() ?? "",
+                Apellidos = reader["Apellidos"]?.ToString() ?? "",
+                Email = reader["Email"]?.ToString() ?? "",
+                Contrasena = "", // Nunca devolver el hash
+                Rol = reader["Rol"]?.ToString() ?? "Usuario",
+                EsResponsable = ConvertToBool(reader["EsResponsable"]),
+                PushToken = reader["PushToken"] != DBNull.Value ? reader["PushToken"]?.ToString() : null
+            };
+            return u;
+        }
+
+        /// <summary>
+        /// Convierte de forma segura valores BIT/TINYINT de MariaDB a bool.
+        /// </summary>
+        private bool ConvertToBool(object val)
+        {
+            if (val == null || val == DBNull.Value) return false;
+            if (val is bool b) return b;
+            if (val is sbyte sb) return sb == 1;
+            if (val is byte by) return by == 1;
+            if (val is byte[] bytes && bytes.Length > 0) return bytes[0] == 1;
+            try { return Convert.ToBoolean(val); } catch { return false; }
         }
     }
 }

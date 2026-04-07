@@ -1,24 +1,16 @@
-using System;
-
 namespace MediTimeApi.Models
 {
     public class Medicamento
     {
-        public int IdMedicamentos { get; set; }
-        public int IdUsuario { get; set; }
-        // Se mapea a la columna 'Nombre'
-        public string Nombre { get; set; }
-        // Se mapea a la columna 'TipoMedicament' (OJO: sin 'o' al final según imagen)
-        public string TipoMedicamento { get; set; }
-        public string Dosis { get; set; }
-        // Se recibe como string (ej "14:00") pero en BD es TIME
-        public string HoraToma { get; set; }
-        public string Notas { get; set; }
+        public int IDMedicamento { get; set; }
+        public int IDUsuarioPaciente { get; set; }
+        public string Nombre { get; set; } = string.Empty;
+        public string Dosis { get; set; } = string.Empty;
         public DateTime FechaInicio { get; set; }
+        public int FrecuenciaHoras { get; set; }
         public DateTime? FechaFin { get; set; }
-        
-        // Campos de auditoría
-        public DateTime? FechaCreacion { get; set; }
-        public DateTime? FechaModificacion { get; set; }
+        public int StockActual { get; set; }
+        public int UmbralAlerta { get; set; }
+        public bool Activo { get; set; } = true;
     }
 }
