@@ -10,5 +10,7 @@ namespace MediTimeApi.Models
         public string Rol { get; set; } = "Usuario"; // 'Usuario', 'Responsable', 'Cuidador'
         public bool EsResponsable { get; set; }
         public string? PushToken { get; set; }
+        public string? Telefono { get; set; }
+        public DateTime? FechaNacimiento { get; set; }
     }
 }

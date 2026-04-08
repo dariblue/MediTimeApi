@@ -20,5 +20,8 @@ namespace MediTimeApi.Models
         /// Obligatorio si Rol='Usuario' y EsResponsable=false.
         /// </summary>
         public int? IdResponsableAsignado { get; set; }
+
+        public string? Telefono { get; set; }
+        public System.DateTime? FechaNacimiento { get; set; }
     }
 }

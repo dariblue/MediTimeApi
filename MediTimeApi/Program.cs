@@ -29,17 +29,17 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(options =>
 {
-    options.SwaggerDoc("v2", new Microsoft.OpenApi.Models.OpenApiInfo
+    options.SwaggerDoc("v2.1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
         Title = "MediTime API",
-        Version = "2.0",
-        Description = "API REST para la gestión y supervisión de toma de medicamentos — MediTime v2.0"
+        Version = "2.1",
+        Description = "API REST para la gestión y supervisión de toma de medicamentos — MediTime v2.1"
     });
 });
 
 var app = builder.Build();
 
-Console.WriteLine("=== MediTime API v2.0 ===");
+Console.WriteLine("=== MediTime API v2.1 ===");
 Console.WriteLine($"Entorno: {app.Environment.EnvironmentName}");
 
 // Swagger solo en desarrollo
@@ -48,7 +48,7 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/swagger/v2/swagger.json", "MediTime API v2.0");
+        options.SwaggerEndpoint("/swagger/v2.1/swagger.json", "MediTime API v2.1");
     });
 }
 

@@ -85,7 +85,9 @@ namespace MediTimeApi.Controllers
                     email = usuario.Email,
                     rol = usuario.Rol,
                     esResponsable = usuario.EsResponsable,
-                    pushToken = usuario.PushToken
+                    pushToken = usuario.PushToken,
+                    telefono = usuario.Telefono,
+                    fechaNacimiento = usuario.FechaNacimiento
                 });
             }
 
@@ -126,6 +128,8 @@ namespace MediTimeApi.Controllers
                 rol = usuario.Rol,
                 esResponsable = usuario.EsResponsable,
                 pushToken = usuario.PushToken,
+                telefono = usuario.Telefono,
+                fechaNacimiento = usuario.FechaNacimiento,
                 cuidadores = cuidadores?.Select(c => new
                 {
                     idUsuario = c.IDUsuario,

@@ -39,8 +39,8 @@ namespace MediTimeApi.Services
             {
                 // INSERT del usuario
                 var insertUsuario = new MySqlCommand(
-                    @"INSERT INTO USUARIOS (Nombre, Apellidos, Email, Contrasena, Rol, EsResponsable, PushToken)
-                      VALUES (@Nombre, @Apellidos, @Email, @Contrasena, @Rol, @EsResponsable, @PushToken)",
+                    @"INSERT INTO USUARIOS (Nombre, Apellidos, Email, Contrasena, Rol, EsResponsable, PushToken, Telefono, FechaNacimiento)
+                      VALUES (@Nombre, @Apellidos, @Email, @Contrasena, @Rol, @EsResponsable, @PushToken, @Telefono, @FechaNacimiento)",
                     connection, transaction);
 
                 insertUsuario.Parameters.AddWithValue("@Nombre", request.Nombre);
@@ -50,6 +50,8 @@ namespace MediTimeApi.Services
                 insertUsuario.Parameters.AddWithValue("@Rol", request.Rol);
                 insertUsuario.Parameters.AddWithValue("@EsResponsable", request.EsResponsable);
                 insertUsuario.Parameters.AddWithValue("@PushToken", (object?)request.PushToken ?? DBNull.Value);
+                insertUsuario.Parameters.AddWithValue("@Telefono", (object?)request.Telefono ?? DBNull.Value);
+                insertUsuario.Parameters.AddWithValue("@FechaNacimiento", (object?)request.FechaNacimiento ?? DBNull.Value);
 
                 insertUsuario.ExecuteNonQuery();
                 long nuevoId = insertUsuario.LastInsertedId;
@@ -85,7 +87,7 @@ namespace MediTimeApi.Services
             connection.Open();
 
             var command = new MySqlCommand(
-                "SELECT IDUsuario, Nombre, Apellidos, Email, Contrasena, Rol, EsResponsable, PushToken FROM USUARIOS WHERE Email = @Email",
+                "SELECT IDUsuario, Nombre, Apellidos, Email, Contrasena, Rol, EsResponsable, PushToken, Telefono, FechaNacimiento FROM USUARIOS WHERE Email = @Email",
                 connection);
             command.Parameters.AddWithValue("@Email", email);
 
@@ -124,7 +126,7 @@ namespace MediTimeApi.Services
             connection.Open();
 
             var command = new MySqlCommand(
-                "SELECT IDUsuario, Nombre, Apellidos, Email, Rol, EsResponsable, PushToken FROM USUARIOS WHERE IDUsuario = @Id",
+                "SELECT IDUsuario, Nombre, Apellidos, Email, Rol, EsResponsable, PushToken, Telefono, FechaNacimiento FROM USUARIOS WHERE IDUsuario = @Id",
                 connection);
             command.Parameters.AddWithValue("@Id", id);
 
@@ -151,7 +153,9 @@ namespace MediTimeApi.Services
                 Contrasena = "", // Nunca devolver el hash
                 Rol = reader["Rol"]?.ToString() ?? "Usuario",
                 EsResponsable = ConvertToBool(reader["EsResponsable"]),
-                PushToken = reader["PushToken"] != DBNull.Value ? reader["PushToken"]?.ToString() : null
+                PushToken = reader["PushToken"] != DBNull.Value ? reader["PushToken"]?.ToString() : null,
+                Telefono = reader["Telefono"] != DBNull.Value ? reader["Telefono"]?.ToString() : null,
+                FechaNacimiento = reader["FechaNacimiento"] != DBNull.Value ? Convert.ToDateTime(reader["FechaNacimiento"]) : null
             };
             return u;
         }
