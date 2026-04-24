@@ -12,5 +12,7 @@ namespace MediTimeApi.Models
         public string? PushToken { get; set; }
         public string? Telefono { get; set; }
         public DateTime? FechaNacimiento { get; set; }
+        public string? Domicilio { get; set; }
+        public string? AvatarBase64 { get; set; }
     }
 }
