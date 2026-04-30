@@ -11,6 +11,7 @@ builder.Services.AddScoped<UsuarioService>();
 builder.Services.AddScoped<MedicamentoService>();
 builder.Services.AddScoped<PacienteCuidadorService>();
 builder.Services.AddScoped<HistorialTomaService>();
+builder.Services.AddScoped<PushSubscriptionService>();
 
 // Habilita CORS globalmente
 builder.Services.AddCors(options =>
