@@ -12,6 +12,10 @@ builder.Services.AddScoped<MedicamentoService>();
 builder.Services.AddScoped<PacienteCuidadorService>();
 builder.Services.AddScoped<HistorialTomaService>();
 builder.Services.AddScoped<PushSubscriptionService>();
+builder.Services.AddScoped<WebPushService>();
+
+// Registrar el Cron Job de Alertas en segundo plano
+builder.Services.AddHostedService<AlertWorker>();
 
 // Habilita CORS globalmente
 builder.Services.AddCors(options =>

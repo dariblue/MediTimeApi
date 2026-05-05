@@ -10,11 +10,13 @@ namespace MediTimeApi.Controllers
     {
         private readonly PushSubscriptionService _service;
         private readonly IConfiguration _configuration;
+        private readonly WebPushService _webPushService;
 
-        public PushSubscriptionsController(PushSubscriptionService service, IConfiguration configuration)
+        public PushSubscriptionsController(PushSubscriptionService service, IConfiguration configuration, WebPushService webPushService)
         {
             _service = service;
             _configuration = configuration;
+            _webPushService = webPushService;
         }
 
         [HttpPost("subscribe")]
@@ -66,6 +68,41 @@ namespace MediTimeApi.Controllers
             // Return base64url encoded key for frontend
             var base64UrlKey = publicKey.Replace("+", "-").Replace("/", "_").Replace("=", "");
             return Ok(new { publicKey = base64UrlKey });
+        }
+
+        [HttpPost("test-delayed-push")]
+        public IActionResult TestDelayedPush([FromBody] PushSubscriptionRequest request)
+        {
+            if (request == null || request.IdUsuario <= 0)
+                return BadRequest("ID de usuario requerido.");
+
+            var userId = request.IdUsuario;
+            var subscriptions = _service.ObtenerSuscripcionesPorUsuario(userId);
+
+            if (subscriptions == null || !subscriptions.Any())
+                return BadRequest("El usuario no tiene suscripciones Push.");
+
+            // Disparar tarea en segundo plano (Fire and forget)
+            Task.Run(async () =>
+            {
+                await Task.Delay(60000); // 1 minuto
+                var payload = new
+                {
+                    title = "¡Test Exitoso desde el Servidor!",
+                    body = "Si estás viendo esto con la app cerrada, tu Web Push funciona perfectamente en producción.",
+                    tag = $"test-{DateTime.Now.Ticks}",
+                    idMedicamento = 0
+                };
+                
+                string jsonPayload = System.Text.Json.JsonSerializer.Serialize(payload);
+
+                foreach (var sub in subscriptions)
+                {
+                    await _webPushService.SendPushNotificationAsync(sub, jsonPayload);
+                }
+            });
+
+            return Ok(new { message = "Prueba de notificación programada para dentro de 1 minuto." });
         }
     }
 }
